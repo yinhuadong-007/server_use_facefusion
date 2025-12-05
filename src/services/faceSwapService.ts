@@ -42,8 +42,8 @@ export async function faceSwap(sourceImagePath: string, targetImagePath: string)
     // 使用headless-run命令避免UI加载错误，并使用绝对路径确保文件可访问
     // 指定具体的输出文件名而不是仅指定目录
     // 指定使用 inswapper_128_fp16 模型
-      const command = `${pythonExecutable} "${faceFusionConfig.scriptPath}" headless-run --source "${path.resolve(sourceImagePath)}" --target "${path.resolve(targetImagePath)}" -o "${path.resolve(outputPath)}" --output-image-quality ${faceFusionConfig.outputImageQuality} --face-swapper-model ${faceFusionConfig.defaultModel}`;
-    // --face-swapper-model inswapper_128_fp16`;
+    // 使用--face-selector-mode many参数以处理多张脸，使用--face-detector-angles参数以处理不同角度
+    const command = `${pythonExecutable} "${faceFusionConfig.scriptPath}" headless-run --source "${path.resolve(sourceImagePath)}" --target "${path.resolve(targetImagePath)}" -o "${path.resolve(outputPath)}" --face-swapper-model ${faceFusionConfig.defaultModel} --face-selector-mode many --face-detector-angles ${faceFusionConfig.faceDetectorAngles} --output-image-quality ${faceFusionConfig.outputImageQuality}`;
     
     console.log('Executing FaceFusion command:', command);
     

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
+import os from 'os';
 import { faceSwap, testFaceFusion } from './services/faceSwapService';
 import { serverConfig, directoryConfig } from './config';
 
@@ -35,15 +36,48 @@ const PROTOCOL = serverConfig.protocol;
 
 // 生成结果URL的辅助函数
 function generateResultUrl(resultPath: string): string {
-  const protocol = process.env.PROTOCOL || 'http';
-  const host = process.env.HOST || 'localhost';
-  const port = process.env.PORT || 9001;
+  const protocol = serverConfig.protocol;
+  // 如果host配置为0.0.0.0，则使用服务器实际IP地址，否则使用配置的host
+  const host = serverConfig.host === '0.0.0.0' ? getServerIpAddress() : serverConfig.host;
+  const port = serverConfig.port;
   const fileName = path.basename(resultPath);
   return `${protocol}://${host}:${port}/results/${fileName}`;
 }
 
+// 获取服务器实际IP地址的辅助函数
+function getServerIpAddress(): string {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    const networkInterface = interfaces[name];
+    // 检查网络接口是否存在
+    if (!networkInterface) {
+      continue;
+    }
+    
+    for (const iface of networkInterface) {
+      // 跳过内部地址和IPv6地址
+      if (iface.internal || iface.family !== 'IPv4') {
+        continue;
+      }
+      
+      // 返回第一个有效的IPv4地址
+      // 优先选择192.168.x.x或10.x.x.x范围内的地址
+      if (iface.address.startsWith('192.168.') || iface.address.startsWith('10.')) {
+        return iface.address;
+      }
+    }
+  }
+  
+  // 如果没有找到合适的地址，返回localhost作为后备
+  return 'localhost';
+}
+
 // 中间件
-app.use(cors());
+app.use(cors({
+  origin: '*', // 允许任何来源的请求
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 // 使用绝对路径确保静态文件服务正常工作
 const publicPath = path.join(__dirname, '../', directoryConfig.publicDir);
@@ -65,6 +99,24 @@ if (!fs.existsSync(directoryConfig.resultsDir)) {
 // 健康检查端点
 app.get('/', (req, res) => {
   res.json({ message: 'FaceSwap Server is running!' });
+});
+
+// 测试端点，用于验证服务器IP地址获取功能
+app.get('/api/test-ip', (req, res) => {
+  try {
+    const ipAddress = getServerIpAddress();
+    res.json({ 
+      success: true,
+      ipAddress: ipAddress,
+      message: `服务器IP地址: ${ipAddress}`
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      error: '获取服务器IP地址失败',
+      message: (error as Error).message 
+    });
+  }
 });
 
 // FaceFusion 可用性检查端点

@@ -31,7 +31,10 @@ export const faceFusionConfig = {
   defaultModel: process.env.FACEFUSION_DEFAULT_MODEL || 'inswapper_128_fp16',
   
   // 输出图像质量
-  outputImageQuality: parseInt(process.env.FACEFUSION_OUTPUT_QUALITY || '80', 10),
+  outputImageQuality: parseInt(process.env.FACEFUSION_OUTPUT_QUALITY || '100', 10),
+  
+  // 面部检测角度
+  faceDetectorAngles: process.env.FACEFUSION_FACE_DETECTOR_ANGLES || '0 90 180 270',
   
   // 命令执行超时时间 (毫秒)
   commandTimeout: parseInt(process.env.FACEFUSION_COMMAND_TIMEOUT || '300000', 10), // 5分钟
