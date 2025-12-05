@@ -3,6 +3,7 @@ import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import { faceSwap, testFaceFusion } from './services/faceSwapService';
+import { serverConfig, directoryConfig } from './config';
 
 // 创建上传中间件，用于处理文件上传
 const storage = multer.diskStorage({
@@ -21,21 +22,32 @@ const upload = multer({
   limits: {
     fieldNameSize: 255, // 字段名称最大长度
     fieldSize: 1024 * 1024, // 字段值最大大小 (1MB)
-    fileSize: 100 * 1024 * 1024, // 文件最大大小 (100MB)
-    files: 2 // 最大文件数量
+    fileSize: serverConfig.uploadFileSizeLimit, // 文件最大大小
+    files: serverConfig.maxUploadFiles // 最大文件数量
   }
 });
 
 // 创建 Express 应用
 const app = express();
-const PORT = process.env.PORT || 9001;
+const HOST = serverConfig.host;
+const PORT = serverConfig.port;
+const PROTOCOL = serverConfig.protocol;
+
+// 生成结果URL的辅助函数
+function generateResultUrl(resultPath: string): string {
+  const protocol = process.env.PROTOCOL || 'http';
+  const host = process.env.HOST || 'localhost';
+  const port = process.env.PORT || 9001;
+  const fileName = path.basename(resultPath);
+  return `${protocol}://${host}:${port}/results/${fileName}`;
+}
 
 // 中间件
 app.use(cors());
 app.use(express.json());
 // 使用绝对路径确保静态文件服务正常工作
-const publicPath = path.join(__dirname, '../public');
-const resultsPath = path.join(__dirname, '../results');
+const publicPath = path.join(__dirname, '../', directoryConfig.publicDir);
+const resultsPath = path.join(__dirname, '../', directoryConfig.resultsDir);
 console.log('Public path:', publicPath);
 console.log('Results path:', resultsPath);
 app.use(express.static(publicPath));
@@ -43,11 +55,11 @@ app.use('/results', express.static(resultsPath));
 
 // 确保上传和结果目录存在
 import fs from 'fs';
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
+if (!fs.existsSync(directoryConfig.uploadsDir)) {
+  fs.mkdirSync(directoryConfig.uploadsDir);
 }
-if (!fs.existsSync('results')) {
-  fs.mkdirSync('results');
+if (!fs.existsSync(directoryConfig.resultsDir)) {
+  fs.mkdirSync(directoryConfig.resultsDir);
 }
 
 // 健康检查端点
@@ -103,8 +115,7 @@ app.post('/api/swap-face', upload.fields([
     res.json({
       success: true,
       message: '换脸成功',
-      resultUrl: `results/${path.basename(resultPath)}`,
-      base64: await readFileAsBase64(resultPath)
+      resultUrl: generateResultUrl(resultPath),
     });
   } catch (error) {
     console.error('Face swap error:', error);
@@ -116,50 +127,61 @@ app.post('/api/swap-face', upload.fields([
   }
 });
 
-// 换脸 API 端点（使用上传的图片）
-app.post('/api/swap-face-target', upload.fields([
-    { name: 'image', maxCount: 1 }
-]), async (req, res) => {
-    try {
-        // 检查是否收到两个图片文件
-        if (!req.files ||
-            !('image' in req.files) ||
-            (req.files as { [fieldname: string]: Express.Multer.File[] })['image'].length === 0) {
-            return res.status(400).json({
-                error: '请提供目标图像文件'
-            });
-        }
-
-        const sourceImagePath = path.join(__dirname, 'src/asset/face.png');
-        const targetImagePath = (req.files as { [fieldname: string]: Express.Multer.File[] })['targetImage'][0].path;
-
-        console.log(`Processing face swap: source=${sourceImagePath}, target=${targetImagePath}`);
-
-        // 调用 FaceFusion 进行换脸处理
-        const resultPath = await faceSwap(sourceImagePath, targetImagePath);
-
-        // 返回结果
-        res.json({
-            success: true,
-            message: '换脸成功',
-            resultUrl: `results/${path.basename(resultPath)}`,
-            base64: await readFileAsBase64(resultPath)
-        });
-    } catch (error) {
-        console.error('Face swap error:', error);
-        res.status(500).json({
-            success: false,
-            error: '换脸处理失败',
-            message: (error as Error).message
-        });
+// 换脸 API 端点（使用固定的源图片）
+app.post('/api/swap-face-target', upload.single('targetImage'), async (req, res) => {
+  try {
+    // 检查是否收到目标图片文件
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: '请提供目标图像文件' 
+      });
     }
+
+    // 使用固定的源图片路径
+    const sourceImagePath = path.join(__dirname, './asset/face.png');
+    const targetImagePath = req.file.path;
+
+    console.log(`Processing face swap with fixed source: target=${targetImagePath}`);
+
+    // 检查源图片是否存在
+    if (!fs.existsSync(sourceImagePath)) {
+      return res.status(500).json({ 
+        success: false,
+        error: '系统错误',
+        message: '源图像文件不存在，请联系管理员' 
+      });
+    }
+
+    // 调用 FaceFusion 进行换脸处理
+    const resultPath = await faceSwap(sourceImagePath, targetImagePath);
+
+    // 返回结果
+    res.json({
+      success: true,
+      message: '换脸成功',
+      resultUrl: generateResultUrl(resultPath),
+    });
+  } catch (error) {
+    console.error('Face swap error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '换脸处理失败',
+      message: (error as Error).message 
+    });
+  }
 });
 
 
 
 // 启动服务器
-app.listen(PORT, async () => {
-  console.log(`Server is running on port ${PORT}`);
+app.listen(Number(PORT), HOST, async () => {
+  console.log(`==================================================`);
+  console.log(`🚀 人脸交换服务启动成功!`);
+  console.log(`📡 服务器地址: ${PROTOCOL}://${HOST}:${PORT}`);
+  console.log(`📁 上传目录: ${path.resolve(directoryConfig.uploadsDir)}`);
+  console.log(`📊 结果目录: ${path.resolve(directoryConfig.resultsDir)}`);
+  console.log(`⏱️  当前时间: ${new Date().toLocaleString()}`);
+  console.log(`==================================================`);
   
   // 启动时检查 FaceFusion 可用性
   try {

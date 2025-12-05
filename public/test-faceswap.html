@@ -42,9 +42,15 @@
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            border: 1px solid #ddd;
+            border: 2px dashed #ddd;
             border-radius: 4px;
             background-color: #f9f9f9;
+            transition: border-color 0.3s ease;
+        }
+        
+        .image-container.dragover {
+            border-color: #4CAF50;
+            background-color: #e8f5e9;
         }
         .image-container img {
             max-width: 100%;
@@ -257,7 +263,6 @@
                     if (result.success) {
                         // 显示结果
                         console.log('result.resultUrl:', result.resultUrl);
-                        console.log('result.base64:', result.base64);
                         document.getElementById('resultImage').src = result.resultUrl;
                         document.getElementById('resultContainer').classList.add('active');
                         
@@ -278,52 +283,77 @@
             }
         }
         
-        
-        
-        // 添加文件选择功能
-        function setupFileUpload() {
-            // 创建文件输入元素
-            const sourceFileInput = document.createElement('input');
-            sourceFileInput.type = 'file';
-            sourceFileInput.id = 'sourceFileInput';
-            sourceFileInput.accept = 'image/*';
-            sourceFileInput.style.display = 'none';
-            
-            const targetFileInput = document.createElement('input');
-            targetFileInput.type = 'file';
-            targetFileInput.id = 'targetFileInput';
-            targetFileInput.accept = 'image/*';
-            targetFileInput.style.display = 'none';
-            
-            document.body.appendChild(sourceFileInput);
-            document.body.appendChild(targetFileInput);
-            
-            // 修改图片容器以支持点击上传
+        // 初始化拖拽功能
+        function initDragAndDrop() {
             const sourceContainer = document.querySelector('#sourceImage').parentElement;
             const targetContainer = document.querySelector('#targetImage').parentElement;
+            const sourceFileInput = document.getElementById('sourceFileInput');
+            const targetFileInput = document.getElementById('targetFileInput');
             
-            sourceContainer.style.cursor = 'pointer';
-            targetContainer.style.cursor = 'pointer';
+            // 设置源图像容器的拖拽事件
+            setupDragEvents(sourceContainer, sourceFileInput, 'sourceImage');
             
-            sourceContainer.title = '点击选择源图像';
-            targetContainer.title = '点击选择目标图像';
-            
-            sourceContainer.addEventListener('click', () => {
-                sourceFileInput.click();
+            // 设置目标图像容器的拖拽事件
+            setupDragEvents(targetContainer, targetFileInput, 'targetImage');
+        }
+        
+        // 设置拖拽事件
+        function setupDragEvents(container, fileInput, imageId) {
+            // 阻止默认拖拽行为
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                container.addEventListener(eventName, preventDefaults, false);
             });
             
-            targetContainer.addEventListener('click', () => {
-                targetFileInput.click();
+            // 添加视觉反馈
+            ['dragenter', 'dragover'].forEach(eventName => {
+                container.addEventListener(eventName, highlight, false);
             });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                container.addEventListener(eventName, unhighlight, false);
+            });
+            
+            // 处理文件 drop
+            container.addEventListener('drop', handleDrop, false);
             
             // 处理文件选择
-            sourceFileInput.addEventListener('change', (event) => {
-                handleFileSelect(event, 'sourceImage');
+            fileInput.addEventListener('change', (event) => {
+                handleFileSelect(event, imageId);
             });
             
-            targetFileInput.addEventListener('change', (event) => {
-                handleFileSelect(event, 'targetImage');
-            });
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            function highlight() {
+                container.classList.add('dragover');
+            }
+            
+            function unhighlight() {
+                container.classList.remove('dragover');
+            }
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                
+                if (files.length) {
+                    // 检查文件类型是否为图片
+                    const file = files[0];
+                    if (file.type.match('image.*')) {
+                        // 设置文件到对应的 input 元素
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        fileInput.files = dataTransfer.files;
+                        
+                        // 显示预览
+                        handleFileSelect({ target: { files: [file] } }, imageId);
+                    } else {
+                        showStatus('请选择有效的图片文件', 'error');
+                    }
+                }
+            }
         }
         
         // 处理文件选择
@@ -338,8 +368,6 @@
             }
         }
         
-
-        
         // 重置测试
         function resetTest() {
             document.getElementById('resultContainer').classList.remove('active');
@@ -348,21 +376,21 @@
             document.getElementById('swapButton').disabled = false;
         }
         
-        // 页面加载完成后检查图片
+        // 页面加载完成后初始化功能
         window.addEventListener('load', function() {
             const sourceImg = document.getElementById('sourceImage');
             const targetImg = document.getElementById('targetImage');
             
             sourceImg.onerror = function() {
-                showStatus('警告: 无法加载源图像 (am_1.webp)', 'error');
+                showStatus('警告: 无法加载源图像', 'error');
             };
             
             targetImg.onerror = function() {
-                showStatus('警告: 无法加载目标图像 (老外_1.png)', 'error');
+                showStatus('警告: 无法加载目标图像', 'error');
             };
             
-            // 初始化文件上传功能
-            setupFileUpload();
+            // 初始化拖拽功能
+            initDragAndDrop();
         });
     </script>
 </body>

@@ -8,9 +8,11 @@ build/
 # Environment variables
 .env
 
-# Uploads and results
-uploads/
-results/
+# Uploads and results (ignore contents but not the directories themselves)
+uploads/*
+results/*
+!important uploads/.gitkeep
+!important results/.gitkeep
 
 # Logs
 *.log

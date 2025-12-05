@@ -6,7 +6,13 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
+    "start-local": "set HOST=127.0.0.1&& set PORT=9001&& set PROTOCOL=http&& node dist/server.js",
+    "start-network": "set HOST=0.0.0.0&& set PORT=9001&& set PROTOCOL=http&& node dist/server.js",
+    "start-https": "set HOST=0.0.0.0&& set PORT=9001&& set PROTOCOL=https&& node dist/server.js",
     "dev": "ts-node src/server.ts",
+    "dev-local": "set HOST=127.0.0.1&& set PORT=9001&& set PROTOCOL=http&& ts-node src/server.ts",
+    "dev-network": "set HOST=0.0.0.0&& set PORT=9001&& set PROTOCOL=http&& ts-node src/server.ts",
+    "dev-https": "set HOST=0.0.0.0&& set PORT=9001&& set PROTOCOL=https&& ts-node src/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

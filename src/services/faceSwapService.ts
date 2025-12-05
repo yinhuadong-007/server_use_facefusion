@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import util from 'util';
+import { faceFusionConfig } from '../config';
 
 const execPromise = util.promisify(exec);
 
@@ -20,7 +21,7 @@ export async function faceSwap(sourceImagePath: string, targetImagePath: string)
     const outputPath = path.join(process.cwd(), 'results', outputFileName);
     
     // FaceFusion 安装路径
-    const faceFusionPath = 'D:\\A_FaceFusion\\facefusion';
+    const faceFusionPath = faceFusionConfig.installationPath;
     const pythonExecutable = 'python';
     
     // 先检查 FaceFusion 路径是否存在
@@ -41,7 +42,7 @@ export async function faceSwap(sourceImagePath: string, targetImagePath: string)
     // 使用headless-run命令避免UI加载错误，并使用绝对路径确保文件可访问
     // 指定具体的输出文件名而不是仅指定目录
     // 指定使用 inswapper_128_fp16 模型
-      const command = `${pythonExecutable} "${path.join(faceFusionPath, 'facefusion.py')}" headless-run --source "${path.resolve(sourceImagePath)}" --target "${path.resolve(targetImagePath)}" -o "${path.resolve(outputPath)}" --output-image-quality 80 --face-swapper-model inswapper_128_fp16`;
+      const command = `${pythonExecutable} "${faceFusionConfig.scriptPath}" headless-run --source "${path.resolve(sourceImagePath)}" --target "${path.resolve(targetImagePath)}" -o "${path.resolve(outputPath)}" --output-image-quality ${faceFusionConfig.outputImageQuality} --face-swapper-model ${faceFusionConfig.defaultModel}`;
     // --face-swapper-model inswapper_128_fp16`;
     
     console.log('Executing FaceFusion command:', command);
@@ -49,7 +50,7 @@ export async function faceSwap(sourceImagePath: string, targetImagePath: string)
     // 执行命令
     const { stdout, stderr } = await execPromise(command, { 
       cwd: faceFusionPath,
-      timeout: 300000 // 5分钟超时
+      timeout: faceFusionConfig.commandTimeout // 使用配置的超时时间
     });
     
     console.log('FaceFusion stdout:', stdout);
@@ -106,7 +107,7 @@ export async function faceSwap(sourceImagePath: string, targetImagePath: string)
  */
 export async function testFaceFusion(): Promise<boolean> {
   try {
-    const faceFusionPath = 'D:\\A_FaceFusion\\facefusion';
+    const faceFusionPath = faceFusionConfig.installationPath;
     const pythonExecutable = 'python';
     
     // 检查 FaceFusion 路径是否存在
@@ -116,7 +117,7 @@ export async function testFaceFusion(): Promise<boolean> {
     }
     
     // 检查 facefusion.py 文件是否存在
-    const faceFusionScript = path.join(faceFusionPath, 'facefusion.py');
+    const faceFusionScript = faceFusionConfig.scriptPath;
     if (!fs.existsSync(faceFusionScript)) {
       console.error('FaceFusion script not found:', faceFusionScript);
       return false;
@@ -127,7 +128,7 @@ export async function testFaceFusion(): Promise<boolean> {
     
     const { stdout, stderr } = await execPromise(command, { 
       cwd: faceFusionPath,
-      timeout: 30000 // 30秒超时
+      timeout: Math.min(faceFusionConfig.commandTimeout, 30000) // 使用配置的超时时间，但不超过30秒
     });
     
     console.log('FaceFusion test stdout:', stdout);
